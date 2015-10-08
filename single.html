@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Asteroids - Patrik Freij</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" type="text/css" href="/styles/normalize.css" />
+  <style>
+html {
+  background: #222;
+}
+
+body {
+  color: #fff;
+  margin: 0 auto;
+  margin-top: 32px;
+  width: 640px;
+}
+
+#asteroids {
+  border: 4px solid #444;
+  border-radius: 4px;
+  width: 640px;
+  height: 480px;
+}
+
+@media
+  only screen and (max-width: 480px),
+  only screen and (max-device-width: 480px) {
+}
+
+@media
+  only screen and (max-width: 640px),
+  only screen and (max-device-width: 640px) {
+}
+
+@media
+  only screen and (max-width: 1024px),
+  only screen and (max-device-width: 1024px) {
+}
+  </style>
+  <script type="text/javascript" src="ship.js"></script>
+  <script type="text/javascript" src="asteroid.js"></script>
+  <script type="text/javascript" src="laser.js"></script>
+  <script>
+var GAME;
+var MAIN;
+var ctx;
+var keysDown = {};
+var BACKGROUND = '#000';
+var RESET = 82;
+var SCORE = 0;
+var asteroidContainer = [];
+var playerContainer = [];
+var showText = true;
+var row = 30;
+var level = 0;
+var levelTimer = 0;
+
+var ARROWS = {UP: 38, LEFT: 37, RIGHT: 39, DOWN: 40, FIRE: 32};
+var WASD = {UP: 87, LEFT: 65, RIGHT: 68, DOWN: 83, FIRE: 69};
+
+function isColliding(obj1, obj2) {
+  if(obj1.isCollidable && obj2.isCollidable) {
+    if(obj1.x <= obj2.x + obj2.size && obj1.x + obj1.size >= obj2.x &&
+     obj1.y <= obj2.y + obj2.size && obj1.y + obj1.size >= obj2.y) {
+      obj1.isColliding = true;
+      obj2.isColliding = true;
+      return true;
+    }
+  }
+  obj1.isColliding = false;
+  obj2.isColliding = false;
+  
+  return false;
+}
+
+function init() {
+  MAIN = document.getElementById("asteroids");
+  ctx = MAIN.getContext("2d");
+  ctx.canvas.width = parseInt(MAIN.width);
+  ctx.canvas.height = parseInt(MAIN.height);
+  
+  setInterval(update, 30);
+
+  playerContainer.push(new Ship(MAIN.width/2, MAIN.height/2, 12, null, '#0f0', ARROWS));
+}
+
+function clear(ctx) {
+  ctx.clearRect(0, 0, MAIN.width, MAIN.height);
+}
+
+function update() {
+  //console.log(keysDown);
+  clear(ctx);
+
+  ctx.fillStyle = BACKGROUND;
+  ctx.fillRect(0,0,MAIN.width,MAIN.height);
+  
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'top';
+
+  if(asteroidContainer.length > 0) {
+    for(i=0;i<=asteroidContainer.length;i++) {
+      if(asteroidContainer[i]) {
+        for(p=0;p<=playerContainer.length-1;p++) {
+          if(playerContainer[p].laserContainer) {
+            for(l=0;l<=playerContainer[p].laserContainer.length;l++) {
+              if(playerContainer[p].laserContainer[l]) {
+                if(isColliding(playerContainer[p].laserContainer[l], asteroidContainer[i]) || isColliding(playerContainer[p], asteroidContainer[i])) {
+                  playerContainer[p].laserContainer.splice([l], 1);
+                  asteroidContainer[i].isHit(asteroidContainer);
+                  SCORE += 10;
+                }
+              }
+            }
+          }
+          
+          if(isColliding(playerContainer[p], asteroidContainer[i])) {
+            playerContainer[p].isHit();
+            asteroidContainer[i].isHit(asteroidContainer);
+          }
+        }
+      
+        asteroidContainer[i].update();
+        
+        if(asteroidContainer[i].hitCount >= 3) {
+          asteroidContainer.splice([i], 1);
+        }
+      }
+    }
+    levelTimer = 50;
+  } else {
+    if(levelTimer > 0) {
+      levelTimer--;
+      ctx.font = 'normal normal 18px sans-serif';
+      ctx.fillText('Level: '+(level+1), 10, row*2);
+    } else {
+      console.log('LEVEL UP');
+      level++;
+      for(i=1;i<=level;i++) {
+        asteroidContainer.push(new Asteroid(null, null, 80, null, '#fff', 0));
+      }
+    }
+  }
+  ctx.fillText('Score: '+SCORE, 10, row*1);
+  
+  ctx.font = 'normal normal 24px sans-serif';
+  ctx.fillText('Asteroids', 10, 0);
+  ctx.font = 'normal normal 18px sans-serif';
+  if(showText) { ctx.fillText('Arrows + Space / WASD + E', 120, 4); }
+  var gameover = 0;
+  for(p=0;p<=playerContainer.length;p++) {
+    if(playerContainer[p]) {
+      ctx.fillStyle = playerContainer[p].stroke;
+      if(playerContainer[p].deathCount < 3) {
+        ctx.fillText(3 - playerContainer[p].deathCount, 10+(row*p), row*3);
+        playerContainer[p].update();
+      } else {
+        ctx.fillText('Dead', 10+row*p, row*3);
+        playerContainer[p].isCollidable = false;
+        gameover++;
+      }
+    }
+  }
+      
+  if(gameover == playerContainer.length) {
+    ctx.font = 'normal normal 24px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('GAME OVER', MAIN.width/2-100, MAIN.height/3);
+  
+    if(keysDown[RESET]) {
+      asteroidContainer = [];
+      SCORE = 0;
+      level = 0;
+      for(p=0;p<=playerContainer.length;p++) {
+        if(playerContainer[p]) {
+          playerContainer[p].deathCount = 0;
+          playerContainer[p].reset();
+        }
+      }
+    }
+  }
+
+  addEventListener("keydown", function(e) {
+    e = window.event;
+    keysDown[e.keyCode] = true;
+    showText = false;
+  }, false);
+
+  addEventListener("keyup", function(e) {
+    e = window.event;
+    delete keysDown[e.keyCode];
+  }, false);
+}
+
+setTimeout("init();", 0);
+  </script>
+</head>
+<body>
+  <canvas id="asteroids" width="640" height="480">Your web browser doesn't seem to support canvas.</canvas>
+  <!--<div class="description">
+    <h1>Asteroids</h1>
+    <h2>Controls</h2>
+    <ul>
+      <li>Arrow UP: Accelerate</li>
+      <li>Arrow LEFT/RIGHT: Rotate ship</li>
+      <li>Arrow DOWN: Break</li>
+      <li>SPACEBAR: Fire (not implemented)</li>
+    </ul>
+  </div>-->
+<body>
+</html>
